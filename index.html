@@ -17,6 +17,7 @@ h1{font-size:26px;margin:0 0 12px}
 .range button{border:1px solid #243547;background:#0e1722;color:#a8b9cc;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer}
 .range button.active{background:#1c3b63;border-color:#528bd0;color:#fff}
 .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.metrics.single{grid-template-columns:220px}
 .metric{background:#111a24;border:1px solid rgba(148,170,196,.16);border-radius:13px;padding:14px 16px}
 .metric-label{color:#8b9bb0;font-size:11px;margin-bottom:6px;letter-spacing:.02em}
 .metric-value{font-size:22px;font-weight:650}
@@ -52,6 +53,14 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
 .auth input{width:100%;padding:12px;border-radius:9px;border:1px solid #303640;background:#0a1118;color:#f4f7fb;margin-bottom:10px;font-size:14px}
 .auth button{width:100%;padding:12px;border:0;border-radius:9px;background:#f1f3f5;color:#111;font-weight:650;cursor:pointer}
 .hidden{display:none!important}
+.progress{display:none;align-items:flex-end;justify-content:center;gap:28px;padding:60px 20px 40px;min-height:320px}
+.progress.show{display:flex}
+.stage{display:flex;flex-direction:column;align-items:center;gap:12px}
+.bubble{border-radius:50%;background:#2a3340;transition:background .2s}
+.bubble.done{background:#55e3a1}
+.bubble.current{background:#3d9e78;box-shadow:0 0 0 3px rgba(85,227,161,.35)}
+.stage-label{font-size:12px;color:#8b9bb0;font-weight:600}
+.stage.done .stage-label,.stage.current .stage-label{color:#d5e8df}
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .logout{background:transparent;border:1px solid #243547;color:#a8b9cc;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer}
 @media(max-width:700px){.metrics{grid-template-columns:1fr 1fr}.chart{gap:3px}}
@@ -78,12 +87,14 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
       <button data-range="90" onclick="setRange('90')">Last 3 Months</button>
       <button data-range="180" onclick="setRange('180')">Last 6 Months</button>
       <button data-range="year" onclick="setRange('year')">This Year</button>
+      <button data-range="progress" onclick="setRange('progress')">Progress</button>
     </div>
     <div class="metrics" id="metrics"></div>
-    <div class="chart-card">
+    <div class="chart-card" id="chartCard">
       <div class="chart-title">Daily Commitment</div>
       <div class="chart" id="chart"></div>
     </div>
+    <div class="progress" id="progressPane"></div>
   </div>
 
 </div>
@@ -149,7 +160,23 @@ async function render(){
     ["LOGGING CONSISTENCY",consistency,label]
   ].map(([l,v,s])=>`<div class="metric"><div class="metric-label">${l}</div><div class="metric-value">${v}</div><div class="metric-small">${s}</div></div>`).join("");
 
-  const card=document.querySelector(".chart-card");
+  const card=document.getElementById("chartCard");
+  const prog=document.getElementById("progressPane");
+  if(rangeDays==="progress"){
+    card.style.display="none";
+    prog.classList.add("show");
+    const yearDates=getRange("year");
+    const todayKey=dateStr(new Date());
+    const upto=yearDates.filter(d=>d<=todayKey);
+    const yearData=await getEntries(upto[0],upto[upto.length-1]);
+    const realStreak=streak(upto,yearData);
+    document.getElementById("metrics").classList.add("single");document.getElementById("metrics").innerHTML=`<div class="metric"><div class="metric-label">CURRENT STREAK</div><div class="metric-value">${realStreak}</div><div class="metric-small">${realStreak===1?"day":"days"}</div></div>`;
+    renderProgress(realStreak);
+    return;
+  }
+  card.style.display="";
+  prog.classList.remove("show");
+  document.getElementById("metrics").classList.remove("single");
   if(rangeDays==="7"||rangeDays==="30"){
     card.querySelector(".chart-title").textContent="Daily Commitment";
     card.querySelector(".chart-title").style.display="";
@@ -167,6 +194,18 @@ async function render(){
     document.getElementById("chart").className="cal-grid";
     document.getElementById("chart").innerHTML=renderCalendar(dates,data);
   }
+}
+const STAGES=[{d:2,s:24,c:"#6b5344"},{d:7,s:40,c:"#c47a2a"},{d:14,s:56,c:"#c9a227"},{d:30,s:76,c:"#3d6ea8"},{d:60,s:100,c:"#2f7a4f"},{d:90,s:128,c:"#6b4c9a"},{d:180,s:164,c:"#a85a78"}];
+function renderProgress(streak){
+  document.getElementById("progressPane").innerHTML=STAGES.map((st,i)=>{
+    const prev=i===0?0:STAGES[i-1].d;
+    const done=streak>=st.d;
+    const current=!done && streak>=prev;
+    const cls=done?"done":current?"current":"";
+    const pct=done?100:current?Math.round((streak-prev)/(st.d-prev)*100):0;
+    const fill=done?st.c:current?`conic-gradient(${st.c} ${pct}%, #2a3340 ${pct}%)`:"#2a3340";
+    return `<div class="stage ${cls}"><div class="bubble ${cls}" style="width:${st.s}px;height:${st.s}px;background:${fill}"></div><div class="stage-label">${st.d} days</div></div>`;
+  }).join("");
 }
 function renderCalendar(dates,data){
   const set=new Set(dates);
