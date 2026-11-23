@@ -31,6 +31,16 @@ h1{font-size:26px;margin:0 0 12px}
 .bar.no{background:#eb6b78}
 .bar.empty{background:#26313c}
 .bar-label{font-size:9px;margin-top:5px;color:#9aa3ad;background:#0a1118;border:1px solid rgba(148,170,196,.16);border-radius:8px;padding:1px 5px}
+.cal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.cal-month{background:#111a24;border:1px solid rgba(148,170,196,.16);border-radius:13px;padding:12px}
+.cal-head{font-size:14px;font-weight:650;margin-bottom:8px}
+.cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px}
+.cal-week span{text-align:center;color:#8b9bb0;font-size:10px}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-day{aspect-ratio:1;display:grid;place-items:center;font-size:11px;border-radius:50%;color:#6b7a8c}
+.cal-day.yes{background:#1f7a4d;color:#fff}
+.cal-day.no{background:#8b2d36;color:#fff}
+@media(max-width:800px){.cal-grid{grid-template-columns:1fr}}
 .editor{display:none;flex-direction:column;min-height:420px}
 .editor.show{display:flex}
 textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(148,170,196,.16);border-radius:13px;background:#111a24;color:#f4f7fb;font:15px/1.55 Arial,sans-serif;padding:16px;outline:none}
@@ -58,17 +68,16 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
 
 <div id="dashView" class="app hidden">
   <div class="top">
-    <h1>NoPMO</h1>
+    <div></div>
     <button class="logout" onclick="signOut()">Log out</button>
-  </div>
-  <div class="tabs">
-    <button class="tab active" data-tab="dashboard" onclick="showTab('dashboard')">Dashboard</button>
-    <button class="tab" data-tab="definition" onclick="showTab('definition')">Definition</button>
   </div>
   <div id="dashboardPane">
     <div class="range">
-      <button class="active" data-days="7" onclick="setRange(7)">Last 7 days</button>
-      <button data-days="30" onclick="setRange(30)">Last 30 days</button>
+      <button class="active" data-range="7" onclick="setRange('7')">Last 7 days</button>
+      <button data-range="30" onclick="setRange('30')">Last 30 days</button>
+      <button data-range="90" onclick="setRange('90')">Last 3 Months</button>
+      <button data-range="180" onclick="setRange('180')">Last 6 Months</button>
+      <button data-range="year" onclick="setRange('year')">This Year</button>
     </div>
     <div class="metrics" id="metrics"></div>
     <div class="chart-card">
@@ -76,10 +85,7 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
       <div class="chart" id="chart"></div>
     </div>
   </div>
-  <div id="definitionPane" class="editor">
-    <textarea id="defText" placeholder="What this system is. One point per line."></textarea>
-    <div class="save-row"><button class="save-btn" id="saveBtn" onclick="saveDefinition()">Save</button></div>
-  </div>
+
 </div>
 
 <script>
@@ -87,10 +93,31 @@ const SUPABASE_URL="https://tgrgfksbbcvgyinipxqo.supabase.co";
 const SUPABASE_KEY="sb_publishable_qXwSi3Go5Zf1ShGbg0Lb_w_5YVNlt28";
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const DEFINITION_DATE="1970-01-01";
-let user=null, rangeDays=7;
+let user=null, rangeDays="7";
 
 function dateStr(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`;}
-function getRange(n){const out=[];const d=new Date();d.setHours(0,0,0,0);for(let i=n-1;i>=0;i--){const x=new Date(d);x.setDate(d.getDate()-i);out.push(dateStr(x));}return out;}
+function getRange(key){
+  const today=new Date();today.setHours(0,0,0,0);
+  let start,end;
+  if(key==="year"){
+    start=new Date(today.getFullYear(),0,1);
+    end=new Date(today.getFullYear(),11,31);
+  } else if(key==="90"||key==="180"){
+    const months=key==="90"?2:5;
+    start=new Date(today.getFullYear(),today.getMonth()-months,1);
+    end=new Date(today.getFullYear(),today.getMonth()+1,0);
+  } else {
+    end=today;
+    start=new Date(today);start.setDate(today.getDate()-(Number(key)-1));
+  }
+  const out=[];
+  for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)) out.push(dateStr(d));
+  return out;
+}
+function rangeLabel(key){
+  return {7:"last 7 days",30:"last 30 days",90:"last 3 months",180:"last 6 months",year:"this year"}[key]||"";
+}
+function rangeDaysCount(key){return key==="year"?getRange("year").length:Number(key);}
 
 async function getExact(system,start,end){
   const {data}=await sb.from("system_entries").select("entry_date,data").eq("user_id",user.id).eq("system",system).gte("entry_date",start).lte("entry_date",end).order("entry_date",{ascending:true});
@@ -105,26 +132,63 @@ function streak(dates,data){let s=0;for(let i=dates.length-1;i>=0;i--){if(data[d
 
 async function render(){
   const dates=getRange(rangeDays);
+  const today=dateStr(new Date());
+  const countDates=dates.filter(d=>d<=today);
+  const count=countDates.length;
   const data=await getEntries(dates[0],dates[dates.length-1]);
-  const logged=dates.filter(d=>data[d]&&data[d].value);
+  const logged=countDates.filter(d=>data[d]&&data[d].value);
   const yes=logged.filter(d=>data[d].value==="yes");
   const consistency=Math.round(logged.length/dates.length*100)+"%";
   const follow=logged.length?Math.round(yes.length/logged.length*100)+"%":"—";
-  const st=streak(dates,data);
+  const st=streak(countDates,data);
+  const label=rangeLabel(rangeDays);
   document.getElementById("metrics").innerHTML=[
-    [`DAYS KEPT · ${rangeDays} DAYS`,yes.length,`${follow} of logged days`],
+    [`DAYS KEPT · ${count} DAYS`,yes.length,`${follow} of logged days`],
     ["CURRENT STREAK",st,st===1?"day":"days"],
-    ["DAYS LOGGED",logged.length,`of ${rangeDays}`],
-    ["LOGGING CONSISTENCY",consistency,rangeDays===30?"last 30 days":"last 7 days"]
+    ["DAYS LOGGED",logged.length,`of ${count}`],
+    ["LOGGING CONSISTENCY",consistency,label]
   ].map(([l,v,s])=>`<div class="metric"><div class="metric-label">${l}</div><div class="metric-value">${v}</div><div class="metric-small">${s}</div></div>`).join("");
 
-  document.getElementById("chart").innerHTML=dates.map(d=>{
-    const e=data[d];
-    let cls="empty",txt="";
-    if(e&&e.value==="yes"){cls="yes";txt="Yes";}
-    else if(e&&e.value){cls="no";txt=e.tier?e.tier[0].toUpperCase()+e.tier.slice(1):"No";}
-    const day=new Date(d+"T00:00:00").getDate();
-    return `<div class="bar-col"><div class="bar-value">${txt}</div><div class="bar ${cls}" style="height:${cls==="yes"?"100%":cls==="no"?"28%":"3px"}"></div><div class="bar-label">${day}</div></div>`;
+  const card=document.querySelector(".chart-card");
+  if(rangeDays==="7"||rangeDays==="30"){
+    card.querySelector(".chart-title").textContent="Daily Commitment";
+    card.querySelector(".chart-title").style.display="";
+    document.getElementById("chart").className="chart";
+    document.getElementById("chart").innerHTML=dates.map(d=>{
+      const e=data[d];
+      let cls="empty",txt="";
+      if(e&&e.value==="yes"){cls="yes";txt="Yes";}
+      else if(e&&e.value){cls="no";txt=e.tier?e.tier[0].toUpperCase()+e.tier.slice(1):"No";}
+      const day=new Date(d+"T00:00:00").getDate();
+      return `<div class="bar-col"><div class="bar-value">${txt}</div><div class="bar ${cls}" style="height:${cls==="yes"?"100%":cls==="no"?"28%":"3px"}"></div><div class="bar-label">${day}</div></div>`;
+    }).join("");
+  } else {
+    card.querySelector(".chart-title").style.display="none";
+    document.getElementById("chart").className="cal-grid";
+    document.getElementById("chart").innerHTML=renderCalendar(dates,data);
+  }
+}
+function renderCalendar(dates,data){
+  const set=new Set(dates);
+  const months={};
+  dates.forEach(d=>{const [y,m]=d.split("-");const k=y+"-"+m;(months[k]=months[k]||[]).push(d);});
+  const names=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  return Object.keys(months).map(k=>{
+    const [y,m]=k.split("-").map(Number);
+    const first=new Date(y,m-1,1);
+    const start=first.getDay();
+    const daysIn=new Date(y,m,0).getDate();
+    let cells="";
+    for(let i=0;i<start;i++) cells+=`<div></div>`;
+    for(let d=1;d<=daysIn;d++){
+      const key=`${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+      if(!set.has(key)){cells+=`<div class="cal-day">${d}</div>`;continue;}
+      const e=data[key];
+      const cls=e&&e.value==="yes"?"yes":e&&e.value?"no":"";
+      cells+=`<div class="cal-day ${cls}">${d}</div>`;
+    }
+    const title=first.toLocaleDateString("en-US",{month:"long",year:"numeric"});
+    return `<div class="cal-month"><div class="cal-head">${title}</div><div class="cal-week">${names.map(n=>`<span>${n}</span>`).join("")}</div><div class="cal-days">${cells}</div></div>`;
   }).join("");
 }
 
@@ -143,9 +207,9 @@ async function saveDefinition(){
   setTimeout(()=>{btn.classList.remove("saved");btn.textContent="Save";},900);
 }
 
-function setRange(n){
-  rangeDays=n;
-  document.querySelectorAll(".range button").forEach(b=>b.classList.toggle("active",Number(b.dataset.days)===n));
+function setRange(key){
+  rangeDays=key;
+  document.querySelectorAll(".range button").forEach(b=>b.classList.toggle("active",b.dataset.range===key));
   render();
 }
 function showTab(tab){
