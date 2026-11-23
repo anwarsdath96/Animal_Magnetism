@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NoPMO Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#070b10;color:#f4f7fb}
+.app{max-width:1100px;margin:0 auto;padding:28px 20px 60px}
+h1{font-size:26px;margin:0 0 12px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tab{border:1px solid #243547;background:#0e1722;color:#a8b9cc;border-radius:9px;padding:7px 14px;font-size:12px;font-weight:650;cursor:pointer}
+.tab.active{background:#1c3b63;border-color:#528bd0;color:#fff}
+.range{display:flex;gap:6px;margin-bottom:14px}
+.range button{border:1px solid #243547;background:#0e1722;color:#a8b9cc;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer}
+.range button.active{background:#1c3b63;border-color:#528bd0;color:#fff}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.metric{background:#111a24;border:1px solid rgba(148,170,196,.16);border-radius:13px;padding:14px 16px}
+.metric-label{color:#8b9bb0;font-size:11px;margin-bottom:6px;letter-spacing:.02em}
+.metric-value{font-size:22px;font-weight:650}
+.metric-small{color:#8b9bb0;font-size:12px;margin-top:3px}
+.chart-card{background:#111a24;border:1px solid rgba(148,170,196,.16);border-radius:13px;padding:14px 16px 12px}
+.chart-title{font-size:15px;font-weight:600;margin-bottom:10px}
+.chart{height:148px;display:flex;align-items:flex-end;gap:6px;padding-top:8px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0}
+.bar-value{font-size:9px;color:#c5d0dc;margin-bottom:3px;white-space:nowrap}
+.bar{width:54%;min-height:3px;border-radius:5px 5px 1px 1px}
+.bar.yes{background:#55e3a1}
+.bar.no{background:#eb6b78}
+.bar.empty{background:#26313c}
+.bar-label{font-size:9px;margin-top:5px;color:#9aa3ad;background:#0a1118;border:1px solid rgba(148,170,196,.16);border-radius:8px;padding:1px 5px}
+.editor{display:none;flex-direction:column;min-height:420px}
+.editor.show{display:flex}
+textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(148,170,196,.16);border-radius:13px;background:#111a24;color:#f4f7fb;font:15px/1.55 Arial,sans-serif;padding:16px;outline:none}
+.save-row{margin-top:12px;display:flex;justify-content:flex-end}
+.save-btn{border:1px solid rgba(255,255,255,.14);background:linear-gradient(180deg,#f5f8fb,#dfe7ef);color:#071018;padding:10px 18px;border-radius:9px;font-weight:700;font-size:12px;cursor:pointer}
+.save-btn.saved{background:#4fd18a!important;color:#102016!important;border-color:#4fd18a!important}
+.auth{max-width:360px;margin:80px auto;background:#111a24;border:1px solid rgba(148,170,196,.16);border-radius:14px;padding:24px}
+.auth h2{margin:0 0 16px;font-size:18px}
+.auth input{width:100%;padding:12px;border-radius:9px;border:1px solid #303640;background:#0a1118;color:#f4f7fb;margin-bottom:10px;font-size:14px}
+.auth button{width:100%;padding:12px;border:0;border-radius:9px;background:#f1f3f5;color:#111;font-weight:650;cursor:pointer}
+.hidden{display:none!important}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.logout{background:transparent;border:1px solid #243547;color:#a8b9cc;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer}
+@media(max-width:700px){.metrics{grid-template-columns:1fr 1fr}.chart{gap:3px}}
+</style>
+</head>
+<body>
+<div id="authView" class="auth">
+  <h2>NoPMO Dashboard</h2>
+  <input id="email" type="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="signIn()">Sign in</button>
+  <div id="authMsg" style="color:#eb6b78;font-size:13px;margin-top:10px"></div>
+</div>
+
+<div id="dashView" class="app hidden">
+  <div class="top">
+    <h1>NoPMO</h1>
+    <button class="logout" onclick="signOut()">Log out</button>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-tab="dashboard" onclick="showTab('dashboard')">Dashboard</button>
+    <button class="tab" data-tab="definition" onclick="showTab('definition')">Definition</button>
+  </div>
+  <div id="dashboardPane">
+    <div class="range">
+      <button class="active" data-days="7" onclick="setRange(7)">Last 7 days</button>
+      <button data-days="30" onclick="setRange(30)">Last 30 days</button>
+    </div>
+    <div class="metrics" id="metrics"></div>
+    <div class="chart-card">
+      <div class="chart-title">Daily Commitment</div>
+      <div class="chart" id="chart"></div>
+    </div>
+  </div>
+  <div id="definitionPane" class="editor">
+    <textarea id="defText" placeholder="What this system is. One point per line."></textarea>
+    <div class="save-row"><button class="save-btn" id="saveBtn" onclick="saveDefinition()">Save</button></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL="https://tgrgfksbbcvgyinipxqo.supabase.co";
+const SUPABASE_KEY="sb_publishable_qXwSi3Go5Zf1ShGbg0Lb_w_5YVNlt28";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const DEFINITION_DATE="1970-01-01";
+let user=null, rangeDays=7;
+
+function dateStr(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`;}
+function getRange(n){const out=[];const d=new Date();d.setHours(0,0,0,0);for(let i=n-1;i>=0;i--){const x=new Date(d);x.setDate(d.getDate()-i);out.push(dateStr(x));}return out;}
+
+async function getExact(system,start,end){
+  const {data}=await sb.from("system_entries").select("entry_date,data").eq("user_id",user.id).eq("system",system).gte("entry_date",start).lte("entry_date",end).order("entry_date",{ascending:true});
+  const map={};(data||[]).forEach(r=>map[r.entry_date]=r.data||{});return map;
+}
+async function getEntries(start,end){
+  const [legacy,current]=await Promise.all([getExact("Nofap",start,end),getExact("NoPMO",start,end)]);
+  return {...legacy,...current};
+}
+
+function streak(dates,data){let s=0;for(let i=dates.length-1;i>=0;i--){if(data[dates[i]]&&data[dates[i]].value==="yes")s++;else break;}return s;}
+
+async function render(){
+  const dates=getRange(rangeDays);
+  const data=await getEntries(dates[0],dates[dates.length-1]);
+  const logged=dates.filter(d=>data[d]&&data[d].value);
+  const yes=logged.filter(d=>data[d].value==="yes");
+  const consistency=Math.round(logged.length/dates.length*100)+"%";
+  const follow=logged.length?Math.round(yes.length/logged.length*100)+"%":"—";
+  const st=streak(dates,data);
+  document.getElementById("metrics").innerHTML=[
+    [`DAYS KEPT · ${rangeDays} DAYS`,yes.length,`${follow} of logged days`],
+    ["CURRENT STREAK",st,st===1?"day":"days"],
+    ["DAYS LOGGED",logged.length,`of ${rangeDays}`],
+    ["LOGGING CONSISTENCY",consistency,rangeDays===30?"last 30 days":"last 7 days"]
+  ].map(([l,v,s])=>`<div class="metric"><div class="metric-label">${l}</div><div class="metric-value">${v}</div><div class="metric-small">${s}</div></div>`).join("");
+
+  document.getElementById("chart").innerHTML=dates.map(d=>{
+    const e=data[d];
+    let cls="empty",txt="";
+    if(e&&e.value==="yes"){cls="yes";txt="Yes";}
+    else if(e&&e.value){cls="no";txt=e.tier?e.tier[0].toUpperCase()+e.tier.slice(1):"No";}
+    const day=new Date(d+"T00:00:00").getDate();
+    return `<div class="bar-col"><div class="bar-value">${txt}</div><div class="bar ${cls}" style="height:${cls==="yes"?"100%":cls==="no"?"28%":"3px"}"></div><div class="bar-label">${day}</div></div>`;
+  }).join("");
+}
+
+async function loadDefinition(){
+  const rows=await getExact("NoPMO",DEFINITION_DATE,DEFINITION_DATE);
+  const saved=rows[DEFINITION_DATE];
+  document.getElementById("defText").value=saved?.text||(Array.isArray(saved?.bullets)?saved.bullets.join("\n"):"");
+}
+async function saveDefinition(){
+  const text=document.getElementById("defText").value;
+  const bullets=text.split(/\n/).map(l=>l.replace(/^\s*[•\-\*]\s*/,"").trim()).filter(Boolean);
+  const {error}=await sb.from("system_entries").upsert({user_id:user.id,engine:"Personal Engine",system:"NoPMO",entry_date:DEFINITION_DATE,data:{text,bullets}},{onConflict:"user_id,system,entry_date"});
+  if(error){alert("Could not save: "+error.message);return;}
+  const btn=document.getElementById("saveBtn");
+  btn.classList.add("saved");btn.textContent="Saved";
+  setTimeout(()=>{btn.classList.remove("saved");btn.textContent="Save";},900);
+}
+
+function setRange(n){
+  rangeDays=n;
+  document.querySelectorAll(".range button").forEach(b=>b.classList.toggle("active",Number(b.dataset.days)===n));
+  render();
+}
+function showTab(tab){
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+  document.getElementById("dashboardPane").classList.toggle("hidden",tab!=="dashboard");
+  document.getElementById("definitionPane").classList.toggle("show",tab==="definition");
+  if(tab==="definition") loadDefinition();
+}
+
+async function signIn(){
+  const email=document.getElementById("email").value.trim();
+  const password=document.getElementById("password").value;
+  const {data,error}=await sb.auth.signInWithPassword({email,password});
+  if(error){document.getElementById("authMsg").textContent=error.message;return;}
+  onSignedIn(data.user);
+}
+async function signOut(){await sb.auth.signOut();user=null;document.getElementById("dashView").classList.add("hidden");document.getElementById("authView").classList.remove("hidden");}
+async function onSignedIn(u){
+  user=u;
+  document.getElementById("authView").classList.add("hidden");
+  document.getElementById("dashView").classList.remove("hidden");
+  await render();
+}
+sb.auth.getSession().then(({data})=>{if(data.session) onSignedIn(data.session.user);});
+</script>
+</body>
+</html>
