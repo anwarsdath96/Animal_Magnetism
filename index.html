@@ -82,12 +82,12 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
   </div>
   <div id="dashboardPane">
     <div class="range">
-      <button class="active" data-range="7" onclick="setRange('7')">Last 7 days</button>
+      <button class="active" data-range="progress" onclick="setRange('progress')">Progress</button>
+      <button data-range="7" onclick="setRange('7')">Last 7 days</button>
       <button data-range="30" onclick="setRange('30')">Last 30 days</button>
       <button data-range="90" onclick="setRange('90')">Last 3 Months</button>
       <button data-range="180" onclick="setRange('180')">Last 6 Months</button>
       <button data-range="year" onclick="setRange('year')">This Year</button>
-      <button data-range="progress" onclick="setRange('progress')">Progress</button>
     </div>
     <div class="metrics" id="metrics"></div>
     <div class="chart-card" id="chartCard">
@@ -104,7 +104,7 @@ const SUPABASE_URL="https://tgrgfksbbcvgyinipxqo.supabase.co";
 const SUPABASE_KEY="sb_publishable_qXwSi3Go5Zf1ShGbg0Lb_w_5YVNlt28";
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const DEFINITION_DATE="1970-01-01";
-let user=null, rangeDays="7";
+let user=null, rangeDays="progress";
 
 function dateStr(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`;}
 function getRange(key){
