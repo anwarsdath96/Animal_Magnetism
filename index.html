@@ -13,7 +13,8 @@ h1{font-size:26px;margin:0 0 12px}
 .tabs{display:flex;gap:8px;margin-bottom:14px}
 .tab{border:1px solid #243547;background:#0e1722;color:#a8b9cc;border-radius:9px;padding:7px 14px;font-size:12px;font-weight:650;cursor:pointer}
 .tab.active{background:#1c3b63;border-color:#528bd0;color:#fff}
-.range{display:flex;gap:6px;margin-bottom:14px}
+.range{display:flex;align-items:center;gap:6px;margin-bottom:14px}
+.range-spacer{flex:1}
 .range button{border:1px solid #243547;background:#0e1722;color:#a8b9cc;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer}
 .range button.active{background:#1c3b63;border-color:#528bd0;color:#fff}
 .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
@@ -41,6 +42,7 @@ h1{font-size:26px;margin:0 0 12px}
 .cal-day{aspect-ratio:1;display:grid;place-items:center;font-size:11px;border-radius:50%;color:#6b7a8c}
 .cal-day.yes{background:#1f7a4d;color:#fff}
 .cal-day.no{background:#8b2d36;color:#fff}
+.cal-day.streak{background:#7dffa1;color:#0b1a10;font-weight:700}
 @media(max-width:800px){.cal-grid{grid-template-columns:1fr}}
 .editor{display:none;flex-direction:column;min-height:420px}
 .editor.show{display:flex}
@@ -63,6 +65,16 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
 .stage.done .stage-label,.stage.current .stage-label{color:#d5e8df}
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .logout{background:transparent;border:1px solid #243547;color:#a8b9cc;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer}
+.theme-btn{width:32px;height:32px;border:1px solid #243547;border-radius:9px;background:#0e1722;color:#f0c56b;cursor:pointer;display:grid;place-items:center}
+.theme-btn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.top{gap:8px}
+body.light{background:#eef2f6;color:#1d2b3d}
+body.light .metric,body.light .chart-card,body.light .cal-month{background:#fff;border-color:#d5dee8}
+body.light .metric-label,body.light .metric-small,body.light .cal-week span,body.light .stage-label{color:#5c6d82}
+body.light .tab,body.light .range button,body.light .logout,body.light .theme-btn{background:#fff;border-color:#d5dee8;color:#243b58}
+body.light .range button.active{background:#1c3b63;border-color:#528bd0;color:#fff}
+body.light .cal-day{color:#8a97a6}
+body.light .bubble{background:#d7dee6}
 @media(max-width:700px){.metrics{grid-template-columns:1fr 1fr}.chart{gap:3px}}
 </style>
 </head>
@@ -76,10 +88,6 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
 </div>
 
 <div id="dashView" class="app hidden">
-  <div class="top">
-    <div></div>
-    <button class="logout" onclick="signOut()">Log out</button>
-  </div>
   <div id="dashboardPane">
     <div class="range">
       <button class="active" data-range="progress" onclick="setRange('progress')">Progress</button>
@@ -88,6 +96,11 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
       <button data-range="90" onclick="setRange('90')">Last 3 Months</button>
       <button data-range="180" onclick="setRange('180')">Last 6 Months</button>
       <button data-range="year" onclick="setRange('year')">This Year</button>
+      <span class="range-spacer"></span>
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Switch theme">
+        <svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M8.2 14.5a7 7 0 1 1 7.6 0c-.9.6-1.4 1.5-1.5 2.5h-4.6c-.1-1-.6-1.9-1.5-2.5Z"/><path d="M12 2v1.5M4.9 4.9 6 6M2 12h1.5M20.5 12H22M18 6l1.1-1.1"/></svg>
+      </button>
+      <button class="logout" onclick="signOut()">Log out</button>
     </div>
     <div class="metrics" id="metrics"></div>
     <div class="chart-card" id="chartCard">
@@ -192,7 +205,7 @@ async function render(){
   } else {
     card.querySelector(".chart-title").style.display="none";
     document.getElementById("chart").className="cal-grid";
-    document.getElementById("chart").innerHTML=renderCalendar(dates,data);
+    document.getElementById("chart").innerHTML=renderCalendar(dates,data,streakDates(dates,data));
   }
 }
 const STAGES=[{d:2,s:24,c:"#6b5344"},{d:7,s:40,c:"#c47a2a"},{d:14,s:56,c:"#c9a227"},{d:30,s:76,c:"#3d6ea8"},{d:60,s:100,c:"#2f7a4f"},{d:90,s:128,c:"#6b4c9a"},{d:180,s:164,c:"#a85a78"}];
@@ -207,7 +220,17 @@ function renderProgress(streak){
     return `<div class="stage ${cls}"><div class="bubble ${cls}" style="width:${st.s}px;height:${st.s}px;background:${fill}"></div><div class="stage-label">${st.d} days</div></div>`;
   }).join("");
 }
-function renderCalendar(dates,data){
+function streakDates(dates,data){
+  const today=dateStr(new Date());
+  const upto=dates.filter(d=>d<=today);
+  const set=new Set();
+  for(let i=upto.length-1;i>=0;i--){
+    if(data[upto[i]]&&data[upto[i]].value==="yes") set.add(upto[i]);
+    else break;
+  }
+  return set;
+}
+function renderCalendar(dates,data,streakSet){
   const set=new Set(dates);
   const months={};
   dates.forEach(d=>{const [y,m]=d.split("-");const k=y+"-"+m;(months[k]=months[k]||[]).push(d);});
@@ -223,7 +246,7 @@ function renderCalendar(dates,data){
       const key=`${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
       if(!set.has(key)){cells+=`<div class="cal-day">${d}</div>`;continue;}
       const e=data[key];
-      const cls=e&&e.value==="yes"?"yes":e&&e.value?"no":"";
+      const cls=streakSet&&streakSet.has(key)?"streak":e&&e.value==="yes"?"yes":e&&e.value?"no":"";
       cells+=`<div class="cal-day ${cls}">${d}</div>`;
     }
     const title=first.toLocaleDateString("en-US",{month:"long",year:"numeric"});
@@ -272,6 +295,11 @@ async function onSignedIn(u){
   document.getElementById("dashView").classList.remove("hidden");
   await render();
 }
+function toggleTheme(){
+  document.body.classList.toggle("light");
+  localStorage.setItem("nopmo-theme", document.body.classList.contains("light")?"light":"dark");
+}
+if(localStorage.getItem("nopmo-theme")==="light") document.body.classList.add("light");
 sb.auth.getSession().then(({data})=>{if(data.session) onSignedIn(data.session.user);});
 </script>
 </body>
