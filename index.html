@@ -55,7 +55,7 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
 .auth input{width:100%;padding:12px;border-radius:9px;border:1px solid #303640;background:#0a1118;color:#f4f7fb;margin-bottom:10px;font-size:14px}
 .auth button{width:100%;padding:12px;border:0;border-radius:9px;background:#f1f3f5;color:#111;font-weight:650;cursor:pointer}
 .hidden{display:none!important}
-.progress{display:none;align-items:flex-end;justify-content:center;gap:28px;padding:60px 20px 40px;min-height:320px}
+.progress{display:none;align-items:flex-end;justify-content:center;gap:36px;padding:40px 20px 30px;min-height:360px}
 .progress.show{display:flex}
 .stage{display:flex;flex-direction:column;align-items:center;gap:12px}
 .bubble{border-radius:50%;background:#2a3340;transition:background .2s}
@@ -208,15 +208,22 @@ async function render(){
     document.getElementById("chart").innerHTML=renderCalendar(dates,data,streakDates(dates,data));
   }
 }
-const STAGES=[{d:2,s:24,c:"#6b5344"},{d:7,s:40,c:"#c47a2a"},{d:14,s:56,c:"#c9a227"},{d:30,s:76,c:"#3d6ea8"},{d:60,s:100,c:"#2f7a4f"},{d:90,s:128,c:"#6b4c9a"},{d:180,s:164,c:"#a85a78"}];
+const STAGES=[{d:2,s:48,c:"#6b5344"},{d:7,s:72,c:"#c47a2a"},{d:14,s:96,c:"#c9a227"},{d:30,s:124,c:"#3d6ea8"},{d:60,s:156,c:"#2f7a4f"},{d:90,s:192,c:"#6b4c9a"},{d:180,s:236,c:"#a85a78"}];
+function scale(hex, f){
+  const n=parseInt(hex.slice(1),16);
+  const ch=v=>Math.max(0,Math.min(255,Math.round(v*f)));
+  const r=ch(n>>16), g=ch((n>>8)&255), b=ch(n&255);
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
 function renderProgress(streak){
   document.getElementById("progressPane").innerHTML=STAGES.map((st,i)=>{
     const prev=i===0?0:STAGES[i-1].d;
     const done=streak>=st.d;
     const current=!done && streak>=prev;
     const cls=done?"done":current?"current":"";
+    const dark=scale(st.c,0.16), mid=st.c, bright=scale(st.c,1.25);
     const pct=done?100:current?Math.round((streak-prev)/(st.d-prev)*100):0;
-    const fill=done?st.c:current?`conic-gradient(${st.c} ${pct}%, #2a3340 ${pct}%)`:"#2a3340";
+    const fill=done?bright:current?`conic-gradient(${mid} ${pct}%, ${dark} ${pct}%)`:dark;
     return `<div class="stage ${cls}"><div class="bubble ${cls}" style="width:${st.s}px;height:${st.s}px;background:${fill}"></div><div class="stage-label">${st.d} days</div></div>`;
   }).join("");
 }
