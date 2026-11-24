@@ -62,7 +62,6 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
 .bubble.done{background:#55e3a1}
 .bubble.current{background:#3d9e78;box-shadow:0 0 0 3px rgba(85,227,161,.35)}
 .stage-label{font-size:12px;color:#8b9bb0;font-weight:600}
-.stage.done .stage-label,.stage.current .stage-label{color:#d5e8df}
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .logout{background:transparent;border:1px solid #243547;color:#a8b9cc;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer}
 .theme-btn{width:32px;height:32px;border:1px solid #243547;border-radius:9px;background:#0e1722;color:#f0c56b;cursor:pointer;display:grid;place-items:center}
@@ -71,9 +70,13 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
 body.light{background:#eef2f6;color:#1d2b3d}
 body.light .metric,body.light .chart-card,body.light .cal-month{background:#fff;border-color:#d5dee8}
 body.light .metric-label,body.light .metric-small,body.light .cal-week span,body.light .stage-label{color:#5c6d82}
+body.light .stage.done .stage-label,body.light .stage.current .stage-label{color:#5c6d82}
 body.light .tab,body.light .range button,body.light .logout,body.light .theme-btn{background:#fff;border-color:#d5dee8;color:#243b58}
 body.light .range button.active{background:#1c3b63;border-color:#528bd0;color:#fff}
 body.light .cal-day{color:#8a97a6}
+body.light .bar-label{background:#eef2f6;color:#3d4d61;border-color:#d5dee8}
+body.light .bar-value{color:#5c6d82}
+body.light .cal-day.yes,body.light .cal-day.no{color:#fff}
 body.light .bubble{background:#d7dee6}
 @media(max-width:700px){.metrics{grid-template-columns:1fr 1fr}.chart{gap:3px}}
 </style>
@@ -215,13 +218,22 @@ function scale(hex, f){
   const r=ch(n>>16), g=ch((n>>8)&255), b=ch(n&255);
   return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
 }
+function mixWhite(hex, f){
+  const n=parseInt(hex.slice(1),16);
+  const ch=(v,w)=>Math.round(v*(1-w)+255*w);
+  const r=ch(n>>16,f), g=ch((n>>8)&255,f), b=ch(n&255,f);
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
 function renderProgress(streak){
   document.getElementById("progressPane").innerHTML=STAGES.map((st,i)=>{
     const prev=i===0?0:STAGES[i-1].d;
     const done=streak>=st.d;
     const current=!done && streak>=prev;
     const cls=done?"done":current?"current":"";
-    const dark=scale(st.c,0.16), mid=st.c, bright=scale(st.c,1.25);
+    const light=document.body.classList.contains("light");
+    const dark=light?mixWhite(st.c,0.82):scale(st.c,0.16);
+    const mid=st.c;
+    const bright=scale(st.c,1.25);
     const pct=done?100:current?Math.round((streak-prev)/(st.d-prev)*100):0;
     const fill=done?bright:current?`conic-gradient(${mid} ${pct}%, ${dark} ${pct}%)`:dark;
     return `<div class="stage ${cls}"><div class="bubble ${cls}" style="width:${st.s}px;height:${st.s}px;background:${fill}"></div><div class="stage-label">${st.d} days</div></div>`;
@@ -305,8 +317,9 @@ async function onSignedIn(u){
 function toggleTheme(){
   document.body.classList.toggle("light");
   localStorage.setItem("nopmo-theme", document.body.classList.contains("light")?"light":"dark");
+  if(rangeDays==="progress") render();
 }
-if(localStorage.getItem("nopmo-theme")==="light") document.body.classList.add("light");
+if(localStorage.getItem("nopmo-theme")!=="dark") document.body.classList.add("light");
 sb.auth.getSession().then(({data})=>{if(data.session) onSignedIn(data.session.user);});
 </script>
 </body>
