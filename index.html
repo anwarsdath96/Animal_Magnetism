@@ -94,6 +94,7 @@ html.light body .bubble{background:#d7dee6}
 @media(max-width:700px){
   .app{max-width:100%;padding:14px 10px 32px}
   .range{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-bottom:12px;align-items:stretch}
+  #dashboardPane.progress-mode .range{margin-bottom:4px}
   .range-spacer{display:none}
   .range button{width:100%;min-width:0;min-height:42px;padding:5px 2px;font-size:10px;line-height:1.15;white-space:normal;border-radius:8px}
   .range button[data-range="180"],.range button[data-range="year"]{display:none}
@@ -361,6 +362,7 @@ async function saveDefinition(){
 
 function setRange(key){
   rangeDays=key;
+  document.getElementById("dashboardPane").classList.toggle("progress-mode",key==="progress");
   document.querySelectorAll(".range button").forEach(b=>b.classList.toggle("active",b.dataset.range===key));
   render();
 }
@@ -383,6 +385,7 @@ async function onSignedIn(u){
   user=u;
   document.getElementById("authView").classList.add("hidden");
   document.getElementById("dashView").classList.remove("hidden");
+  document.getElementById("dashboardPane").classList.toggle("progress-mode",rangeDays==="progress");
   await render();
 }
 function toggleTheme(){
