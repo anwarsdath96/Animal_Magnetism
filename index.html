@@ -285,14 +285,22 @@ function updateProgressTheme(){
 function renderProgress(streak){
   progressStreak=streak;
   const light=document.documentElement.classList.contains("light");
-  document.getElementById("progressPane").innerHTML=STAGES.map((st,i)=>{
-    const prev=i===0?0:STAGES[i-1].d;
-    const done=streak>=st.d;
-    const current=!done && streak>=prev;
+  const pane=document.getElementById("progressPane");
+  // Build the milestone DOM only once; subsequent visits update it in place.
+  if(!pane.querySelector('.bubble[data-stage]')){
+    pane.innerHTML=STAGES.map(st=>`<div class="stage"><div class="bubble" data-stage="${st.d}" style="width:${st.s}px;height:${st.s}px"></div><div class="stage-label">${st.d} days</div></div>`).join("");
+  }
+  pane.querySelectorAll('.bubble[data-stage]').forEach(b=>{
+    const st=STAGES.find(stage=>String(stage.d)===b.dataset.stage);
+    if(!st)return;
+    const i=STAGES.indexOf(st),prev=i===0?0:STAGES[i-1].d;
+    const done=streak>=st.d,current=!done&&streak>=prev;
     const cls=done?"done":current?"current":"";
-    const fill=progressBubbleFill(st,streak,light);
-    return `<div class="stage ${cls}"><div class="bubble ${cls}" data-stage="${st.d}" style="width:${st.s}px;height:${st.s}px;background:${fill}"></div><div class="stage-label">${st.d} days</div></div>`;
-  }).join("");
+    const stageEl=b.parentElement;
+    stageEl.classList.toggle("done",done);stageEl.classList.toggle("current",current);
+    b.classList.toggle("done",done);b.classList.toggle("current",current);
+    b.style.background=progressBubbleFill(st,streak,light);
+  });
 }
 function streakDates(dates,data){
   const today=dateStr(new Date());
