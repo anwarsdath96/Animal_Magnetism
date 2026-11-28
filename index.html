@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NoPMO Dashboard</title>
+<script>
+// Apply saved theme before the browser paints to prevent a theme flash.
+(function(){
+  let theme="light";
+  try { theme=localStorage.getItem("nopmo-theme")||"light"; } catch(e) {}
+  document.documentElement.classList.toggle("light",theme!=="dark");
+  document.documentElement.classList.toggle("dark",theme==="dark");
+  document.documentElement.style.colorScheme=theme==="dark"?"dark":"light";
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box}
@@ -67,17 +77,17 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
 .theme-btn{width:32px;height:32px;border:1px solid #243547;border-radius:9px;background:#0e1722;color:#f0c56b;cursor:pointer;display:grid;place-items:center}
 .theme-btn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .top{gap:8px}
-body.light{background:#eef2f6;color:#1d2b3d}
-body.light .metric,body.light .chart-card,body.light .cal-month{background:#fff;border-color:#d5dee8}
-body.light .metric-label,body.light .metric-small,body.light .cal-week span,body.light .stage-label{color:#5c6d82}
-body.light .stage.done .stage-label,body.light .stage.current .stage-label{color:#5c6d82}
-body.light .tab,body.light .range button,body.light .logout,body.light .theme-btn{background:#fff;border-color:#d5dee8;color:#243b58}
-body.light .range button.active{background:#1c3b63;border-color:#528bd0;color:#fff}
-body.light .cal-day{color:#8a97a6}
-body.light .bar-label{background:#eef2f6;color:#3d4d61;border-color:#d5dee8}
-body.light .bar-value{color:#5c6d82}
-body.light .cal-day.yes,body.light .cal-day.no{color:#fff}
-body.light .bubble{background:#d7dee6}
+html.light body{background:#eef2f6;color:#1d2b3d}
+html.light body .metric,html.light body .chart-card,html.light body .cal-month{background:#fff;border-color:#d5dee8}
+html.light body .metric-label,html.light body .metric-small,html.light body .cal-week span,html.light body .stage-label{color:#5c6d82}
+html.light body .stage.done .stage-label,html.light body .stage.current .stage-label{color:#5c6d82}
+html.light body .tab,html.light body .range button,html.light body .logout,html.light body .theme-btn{background:#fff;border-color:#d5dee8;color:#243b58}
+html.light body .range button.active{background:#1c3b63;border-color:#528bd0;color:#fff}
+html.light body .cal-day{color:#8a97a6}
+html.light body .bar-label{background:#eef2f6;color:#3d4d61;border-color:#d5dee8}
+html.light body .bar-value{color:#5c6d82}
+html.light body .cal-day.yes,html.light body .cal-day.no{color:#fff}
+html.light body .bubble{background:#d7dee6}
 @media(max-width:700px){.metrics{grid-template-columns:1fr 1fr}.chart{gap:3px}}
 
 /* Mobile-only NoPMO refinements */
@@ -261,7 +271,7 @@ function renderProgress(streak){
     const done=streak>=st.d;
     const current=!done && streak>=prev;
     const cls=done?"done":current?"current":"";
-    const light=document.body.classList.contains("light");
+    const light=document.documentElement.classList.contains("light");
     const dark=light?mixWhite(st.c,0.82):scale(st.c,0.16);
     const mid=st.c;
     const bright=scale(st.c,1.25);
@@ -346,11 +356,13 @@ async function onSignedIn(u){
   await render();
 }
 function toggleTheme(){
-  document.body.classList.toggle("light");
-  localStorage.setItem("nopmo-theme", document.body.classList.contains("light")?"light":"dark");
+  const light=document.documentElement.classList.toggle("light");
+  document.documentElement.classList.toggle("dark",!light);
+  document.body.classList.toggle("light",light);
+  document.documentElement.style.colorScheme=light?"light":"dark";
+  localStorage.setItem("nopmo-theme",light?"light":"dark");
   if(rangeDays==="progress") render();
 }
-if(localStorage.getItem("nopmo-theme")!=="dark") document.body.classList.add("light");
 sb.auth.getSession().then(({data})=>{if(data.session) onSignedIn(data.session.user);});
 </script>
 </body>
