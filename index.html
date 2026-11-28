@@ -88,7 +88,7 @@ html.light body .bar-label{background:#eef2f6;color:#3d4d61;border-color:#d5dee8
 html.light body .bar-value{color:#5c6d82}
 html.light body .cal-day.yes,html.light body .cal-day.no{color:#fff}
 html.light body .bubble{background:#d7dee6}
-@media(max-width:700px){.metrics{grid-template-columns:1fr 1fr}.metrics.single{grid-template-columns:1fr}.chart{gap:3px}}
+@media(max-width:700px){.metrics{grid-template-columns:1fr 1fr}.metrics.single{grid-template-columns:220px;justify-content:start}.chart{gap:3px}}
 
 /* Mobile-only NoPMO refinements */
 @media(max-width:700px){
@@ -203,15 +203,18 @@ async function render(){
   const prog=document.getElementById("progressPane");
   const metricsEl=document.getElementById("metrics");
   if(rangeDays==="progress"){
-    // Switch the layout immediately; avoid rendering the generic metrics/chart first.
+    // Paint the cached Progress state immediately; refresh data asynchronously in-place.
     card.style.display="none";
-    prog.classList.add("show");
     metricsEl.classList.add("single");
+    metricsEl.innerHTML=`<div class="metric"><div class="metric-label">CURRENT STREAK</div><div class="metric-value">${progressStreak}</div><div class="metric-small">${progressStreak===1?"day":"days"}</div></div>`;
+    renderProgress(progressStreak);
+    prog.classList.add("show");
     const yearDates=getRange("year");
     const todayKey=dateStr(new Date());
     const upto=yearDates.filter(d=>d<=todayKey);
     const yearData=await getEntries(upto[0],upto[upto.length-1]);
     const realStreak=streak(upto,yearData);
+    progressStreak=realStreak;
     metricsEl.innerHTML=`<div class="metric"><div class="metric-label">CURRENT STREAK</div><div class="metric-value">${realStreak}</div><div class="metric-small">${realStreak===1?"day":"days"}</div></div>`;
     renderProgress(realStreak);
     return;
