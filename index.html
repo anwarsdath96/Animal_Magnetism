@@ -79,6 +79,33 @@ body.light .bar-value{color:#5c6d82}
 body.light .cal-day.yes,body.light .cal-day.no{color:#fff}
 body.light .bubble{background:#d7dee6}
 @media(max-width:700px){.metrics{grid-template-columns:1fr 1fr}.chart{gap:3px}}
+
+/* Mobile-only NoPMO refinements */
+@media(max-width:700px){
+  .app{max-width:100%;padding:14px 10px 32px}
+  .range{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-bottom:12px;align-items:stretch}
+  .range-spacer{display:none}
+  .range button{width:100%;min-width:0;min-height:42px;padding:5px 2px;font-size:10px;line-height:1.15;white-space:normal;border-radius:8px}
+  .range button[data-range="180"],.range button[data-range="year"]{display:none}
+  .range button[data-range="30"]{display:none}
+  .range button.mobile-month{display:block}
+  .range .theme-btn{width:34px;min-height:34px;grid-column:3;justify-self:end}
+  .range .logout{grid-column:4;justify-self:end;min-height:34px}
+  .metrics{gap:7px;margin-bottom:10px}
+  .metric{padding:10px 11px;border-radius:11px}
+  .metric-label{font-size:10px;line-height:1.2}
+  .metric-value{font-size:20px}
+  .metric-small{font-size:11px}
+  .chart-card{padding:11px 10px}
+  .cal-grid{grid-template-columns:1fr;gap:9px}
+  .cal-month{padding:10px;border-radius:11px}
+  .cal-days{gap:3px}
+  .cal-day{font-size:10px}
+  .progress{flex-direction:column;align-items:center;justify-content:flex-start;gap:14px;padding:20px 10px 24px;min-height:0}
+  .stage{gap:5px}
+  .stage-label{font-size:11px}
+}
+@media(min-width:701px){.range button.mobile-month{display:none}}
 </style>
 </head>
 <body>
@@ -96,6 +123,7 @@ body.light .bubble{background:#d7dee6}
       <button class="active" data-range="progress" onclick="setRange('progress')">Progress</button>
       <button data-range="7" onclick="setRange('7')">Last 7 days</button>
       <button data-range="30" onclick="setRange('30')">Last 30 days</button>
+      <button class="mobile-month" data-range="month" onclick="setRange('month')">This Month</button>
       <button data-range="90" onclick="setRange('90')">Last 3 Months</button>
       <button data-range="180" onclick="setRange('180')">Last 6 Months</button>
       <button data-range="year" onclick="setRange('year')">This Year</button>
@@ -129,6 +157,9 @@ function getRange(key){
   if(key==="year"){
     start=new Date(today.getFullYear(),0,1);
     end=new Date(today.getFullYear(),11,31);
+  } else if(key==="month"){
+    start=new Date(today.getFullYear(),today.getMonth(),1);
+    end=new Date(today.getFullYear(),today.getMonth()+1,0);
   } else if(key==="90"||key==="180"){
     const months=key==="90"?2:5;
     start=new Date(today.getFullYear(),today.getMonth()-months,1);
@@ -142,9 +173,9 @@ function getRange(key){
   return out;
 }
 function rangeLabel(key){
-  return {7:"last 7 days",30:"last 30 days",90:"last 3 months",180:"last 6 months",year:"this year"}[key]||"";
+  return {7:"last 7 days",30:"last 30 days",month:"this month",90:"last 3 months",180:"last 6 months",year:"this year"}[key]||"";
 }
-function rangeDaysCount(key){return key==="year"?getRange("year").length:Number(key);}
+function rangeDaysCount(key){return key==="year"||key==="month"?getRange(key).length:Number(key);}
 
 async function getExact(system,start,end){
   const {data}=await sb.from("system_entries").select("entry_date,data").eq("user_id",user.id).eq("system",system).gte("entry_date",start).lte("entry_date",end).order("entry_date",{ascending:true});
@@ -165,7 +196,7 @@ async function render(){
   const data=await getEntries(dates[0],dates[dates.length-1]);
   const logged=countDates.filter(d=>data[d]&&data[d].value);
   const yes=logged.filter(d=>data[d].value==="yes");
-  const consistency=Math.round(logged.length/dates.length*100)+"%";
+  const consistency=Math.round(logged.length/(rangeDays==="month"?countDates.length:dates.length)*100)+"%";
   const follow=logged.length?Math.round(yes.length/logged.length*100)+"%":"—";
   const st=streak(countDates,data);
   const label=rangeLabel(rangeDays);
