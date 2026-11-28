@@ -68,7 +68,7 @@ textarea{flex:1;min-height:360px;width:100%;resize:none;border:1px solid rgba(14
 .progress{display:none;align-items:flex-end;justify-content:center;gap:36px;padding:40px 20px 30px;min-height:360px}
 .progress.show{display:flex}
 .stage{display:flex;flex-direction:column;align-items:center;gap:12px}
-.bubble{border-radius:50%;background:#2a3340;transition:background .2s}
+.bubble{border-radius:50%;background:#2a3340;transition:none!important;will-change:auto}
 .bubble.done{background:#55e3a1}
 .bubble.current{background:#3d9e78;box-shadow:0 0 0 3px rgba(85,227,161,.35)}
 .stage-label{font-size:12px;color:#8b9bb0;font-weight:600}
@@ -265,19 +265,33 @@ function mixWhite(hex, f){
   const r=ch(n>>16,f), g=ch((n>>8)&255,f), b=ch(n&255,f);
   return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
 }
+let progressStreak=0;
+function progressBubbleFill(st, streak, light){
+  const prev=st===STAGES[0]?0:STAGES[STAGES.indexOf(st)-1].d;
+  const done=streak>=st.d;
+  const current=!done && streak>=prev;
+  const dark=light?mixWhite(st.c,0.82):scale(st.c,0.16);
+  const mid=st.c, bright=scale(st.c,1.25);
+  const pct=done?100:current?Math.round((streak-prev)/(st.d-prev)*100):0;
+  return done?bright:current?`conic-gradient(${mid} ${pct}%, ${dark} ${pct}%)`:dark;
+}
+function updateProgressTheme(){
+  const light=document.documentElement.classList.contains("light");
+  document.querySelectorAll("#progressPane .bubble[data-stage]").forEach(b=>{
+    const stage=STAGES.find(st=>String(st.d)===b.dataset.stage);
+    if(stage) b.style.background=progressBubbleFill(stage,progressStreak,light);
+  });
+}
 function renderProgress(streak){
+  progressStreak=streak;
+  const light=document.documentElement.classList.contains("light");
   document.getElementById("progressPane").innerHTML=STAGES.map((st,i)=>{
     const prev=i===0?0:STAGES[i-1].d;
     const done=streak>=st.d;
     const current=!done && streak>=prev;
     const cls=done?"done":current?"current":"";
-    const light=document.documentElement.classList.contains("light");
-    const dark=light?mixWhite(st.c,0.82):scale(st.c,0.16);
-    const mid=st.c;
-    const bright=scale(st.c,1.25);
-    const pct=done?100:current?Math.round((streak-prev)/(st.d-prev)*100):0;
-    const fill=done?bright:current?`conic-gradient(${mid} ${pct}%, ${dark} ${pct}%)`:dark;
-    return `<div class="stage ${cls}"><div class="bubble ${cls}" style="width:${st.s}px;height:${st.s}px;background:${fill}"></div><div class="stage-label">${st.d} days</div></div>`;
+    const fill=progressBubbleFill(st,streak,light);
+    return `<div class="stage ${cls}"><div class="bubble ${cls}" data-stage="${st.d}" style="width:${st.s}px;height:${st.s}px;background:${fill}"></div><div class="stage-label">${st.d} days</div></div>`;
   }).join("");
 }
 function streakDates(dates,data){
@@ -361,7 +375,7 @@ function toggleTheme(){
   document.body.classList.toggle("light",light);
   document.documentElement.style.colorScheme=light?"light":"dark";
   localStorage.setItem("nopmo-theme",light?"light":"dark");
-  if(rangeDays==="progress") render();
+  if(rangeDays==="progress") updateProgressTheme();
 }
 sb.auth.getSession().then(({data})=>{if(data.session) onSignedIn(data.session.user);});
 </script>
